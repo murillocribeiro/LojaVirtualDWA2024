@@ -97,8 +97,8 @@ class PedidoRepo:
     ) -> bool:
         if not valor_total:
             itens = ItemPedidoRepo.obter_por_pedido(id)
-        if itens and not valor_total:
-            valor_total = sum([item.valor_item for item in itens])
+            if itens:
+                valor_total = sum([item.valor_item for item in itens])
         try:
             with obter_conexao() as conexao:
                 cursor = conexao.cursor()

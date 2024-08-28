@@ -73,4 +73,3 @@ SQL_OBTER_POR_ESTADO = """
     FROM pedido
     WHERE (id_cliente = ?) AND (estado = ?)
 """
-

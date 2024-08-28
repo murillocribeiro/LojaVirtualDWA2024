@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from urllib import request
 from fastapi import APIRouter, Form, HTTPException, Path, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import mercadopago as mp
@@ -29,7 +28,7 @@ templates = obter_jinja_templates("templates/cliente")
 
 @router.get("/pedidos")
 async def get_pedidos(request: Request, periodo: str = Query("todos")):
-    data_inicial = datetime(1900,1,1)
+    data_inicial = datetime(1900, 1, 1)
     data_final = datetime.now()
     match periodo:
         case "30":
@@ -116,9 +115,9 @@ async def get_carrinho(request: Request):
         adicionar_mensagem_alerta(
             response,
             "Seu carrinho está vazio. Adicione produtos para continuar."
-        ) 
+        )
         return response
-    total_pedido = sum(item.valor_item for item in itens_pedido)
+    total_pedido = sum([item.valor_item for item in itens_pedido])
     return templates.TemplateResponse(
         "pages/carrinho.html",
         {"request": request, "itens": itens_pedido, "valor_total": total_pedido},
@@ -172,6 +171,8 @@ async def get_pagamento(request: Request, id_pedido: int = Path(...)):
             response, "O pedido em questão não está apto a receber pagamento."
         )
         return response
+    # muda o estado do pedido para PENDENTE
+    PedidoRepo.alterar_estado(id_pedido, EstadoPedido.PENDENTE.value)
     # captura os itens do pedido
     itens = ItemPedidoRepo.obter_por_pedido(pedido.id)
     total_pedido = sum([item.valor_item for item in itens])
@@ -198,7 +199,7 @@ async def get_pagamento(request: Request, id_pedido: int = Path(...)):
         "payer": {
             "name": "Test",
             "surname": "Test",
-            "email": "test_user_141128569@testuser.com",
+            "email": "test_user_1218031040@testuser.com",
         },
         "back_urls": {
             "success": f"{url_de_retorno_do_mp}/cliente/mp/sucesso/{pedido.id}",
@@ -232,10 +233,10 @@ async def get_mp_falha(
     request: Request,
     id_pedido: int = Path(...),
 ):
-    response = RedirectResponse(f"/cliente/resumopedido?id_pedido={id_pedido}")
+    response = RedirectResponse(f"/cliente/detalhespedido/{id_pedido}")
     adicionar_mensagem_erro(
         response,
-        "Houve alguma falha ao processar seu pagamento. Por favor, tente novamente.",
+        "Seu pagamento ainda não foi processado. Você pode tentar realizar o pagamento novamente clicando no botão <b>Pagar com Mercado Pago</b>.",
     )
     return response
 
@@ -277,7 +278,7 @@ async def post_adicionar_carrinho(request: Request, id_produto: int = Form(...))
     else:
         ItemPedidoRepo.aumentar_quantidade_produto(pedido_carrinho.id, id_produto)
         mensagem = f"O produto <b>{produto.nome}</b> já estava no carrinho e teve sua quantidade aumentada."
-        PedidoRepo.atualizar_valor_total(pedido_carrinho.id)
+    PedidoRepo.atualizar_valor_total(pedido_carrinho.id)
     response = RedirectResponse("/cliente/carrinho", status.HTTP_303_SEE_OTHER)
     adicionar_mensagem_sucesso(response, mensagem)
     return response
@@ -313,6 +314,7 @@ async def post_aumentar_item(request: Request, id_produto: int = Form(0)):
         response,
         f"O produto <b>{produto.nome}</b> teve sua quantidade aumentada para <b>{qtde+1}</b>.",
     )
+    PedidoRepo.atualizar_valor_total(pedido_carrinho.id)
     return response
 
 
@@ -353,7 +355,7 @@ async def post_remover_item(request: Request, id_produto: int = Form(0)):
         return RedirectResponse("/cliente/carrinho", status.HTTP_304_NOT_MODIFIED)
     produto = ProdutoRepo.obter_um(id_produto)
     if not produto:
-        respose = RedirectResponse("cliente/carrinho", status.HTTP_304_NOT_MODIFIED)
+        response = RedirectResponse("/cliente/carrinho", status.HTTP_304_NOT_MODIFIED)
         adicionar_mensagem_alerta(response, "Produto não encontrado.")
         return response
     pedidos = PedidoRepo.obter_por_estado(
@@ -369,12 +371,14 @@ async def post_remover_item(request: Request, id_produto: int = Form(0)):
         adicionar_mensagem_alerta(
             f"O produto {id_produto} não foi encontrado em seu carrinho."
         )
-        return response 
+        return response
     ItemPedidoRepo.excluir(pedido_carrinho.id, id_produto)
-    respose = RedirectResponse("cliente/carrinho", status.HTTP_303_SEE_OTHER)
-    adicionar_mensagem_sucesso(response, "Item excluído com sucesso")
+    response = RedirectResponse("/cliente/carrinho", status.HTTP_303_SEE_OTHER)
+    adicionar_mensagem_sucesso(response, "Item excluído com sucesso.")
     PedidoRepo.atualizar_valor_total(pedido_carrinho.id)
     return response
+
+
 
 @router.get("/pedidoconfirmado/{id_pedido:int}", response_class=HTMLResponse)
 async def get_pedidoconfirmado(
@@ -397,7 +401,7 @@ async def get_detalhespedido(
     id_pedido: int = Path(...),
 ):
     pedido = PedidoRepo.obter_por_id(id_pedido)
-    if pedido.id_usuario != request.state.usuario.id:
+    if pedido.id_cliente != request.state.cliente.id:
         response = RedirectResponse(url="/pedidos", status_code=status.HTTP_302_FOUND)
         return adicionar_mensagem_erro(
             response,
@@ -409,3 +413,17 @@ async def get_detalhespedido(
         "pages/detalhespedido.html",
         {"request": request, "pedido": pedido},
     )
+
+@router.post("/post_cancelar_pedido", response_class=RedirectResponse)
+async def post_cancelar_pedido(request: Request, id_pedido: int = Form(0)):
+    pedido = PedidoRepo.obter_por_id(id_pedido)
+    if not pedido or pedido.id_cliente != request.state.cliente.id:
+        response = RedirectResponse(url="/cliente/pedidos", status_code=status.HTTP_302_FOUND)
+        return adicionar_mensagem_erro(
+            response,
+            "Pedido não encontrado. Verifique o número do pedido e tente novamente.",
+        )
+    PedidoRepo.alterar_estado(id_pedido, EstadoPedido.CANCELADO.value)
+    response = RedirectResponse(url="/cliente/pedidos", status_code=status.HTTP_303_SEE_OTHER)
+    adicionar_mensagem_sucesso(response, "Pedido cancelado com sucesso.")
+    return response
