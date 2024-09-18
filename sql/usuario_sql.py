@@ -66,7 +66,7 @@ SQL_OBTER_POR_TOKEN = """
 """
 
 SQL_OBTER_QUANTIDADE_POR_PERFIL = """
-    SELECT COUNT(*) 
+    SELECT COUNT(*)
     FROM usuario
     WHERE perfil=?
 """

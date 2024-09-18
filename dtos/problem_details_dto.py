@@ -1,5 +1,5 @@
-class ProblemDatailsDto:
-    def __init__(self, input, msg, type, loc):
+class ProblemDetailsDto:
+    def __init__(self, input, msg, type, loc = None):
         self.input = input
         self.msg = msg
         self.type = type

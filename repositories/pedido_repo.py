@@ -209,12 +209,12 @@ class PedidoRepo:
             return None
         
     @classmethod
-    def obter_todos_por_estado(cls, id_cliente: int, estado: int) -> List[Pedido]:
+    def obter_todos_por_estado(cls, estado: int) -> List[Pedido]:
         try:
             with obter_conexao() as conexao:
                 cursor = conexao.cursor()
                 tuplas = cursor.execute(
-                    SQL_OBTER_TODOS_POR_ESTADO, (estado ,),
+                    SQL_OBTER_TODOS_POR_ESTADO, (estado,),
                 ).fetchall()
                 pedidos = [Pedido(*t) for t in tuplas]
                 return pedidos

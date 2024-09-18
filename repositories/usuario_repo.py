@@ -29,7 +29,7 @@ class UsuarioRepo:
                         usuario.telefone,
                         usuario.email,
                         usuario.perfil,
-                        usuario.senha
+                        usuario.senha                        
                     ),
                 )
                 if cursor.rowcount > 0:
