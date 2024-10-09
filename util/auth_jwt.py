@@ -13,8 +13,6 @@ from util.cookies import NOME_COOKIE_AUTH, NOME_HEADER_AUTH
 async def obter_usuario_logado(request: Request) -> dict:    
     token_cookie = request.cookies.get(NOME_COOKIE_AUTH)
     token_header = request.headers.get(NOME_HEADER_AUTH)
-    # token_cookie = token_cookie.strip() if token_cookie else ""
-    # token_header = token_header.strip() if token_header else ""
     if not token_cookie and not token_header:
         return None
     token = token_cookie if token_cookie else token_header.replace("Bearer ", "")
